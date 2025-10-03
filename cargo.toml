@@ -1,7 +1,16 @@
 [package]
 name = "dischat"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-tokio = { version = "1.47.1", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+
+[[bin]]
+name = "chat-server"
+path = "server/main.rs"
+
+[[bin]]
+name = "chat-client"
+path = "client/main.rs"
