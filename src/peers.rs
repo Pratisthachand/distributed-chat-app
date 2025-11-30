@@ -300,7 +300,7 @@ impl PeerManager {
     }
 
     /// Broadcast a message to all peers
-\    /// WHY: When we receive a message from a client or need to send a heartbeat,
+    /// WHY: When we receive a message from a client or need to send a heartbeat,
     /// we call this to send it to everyone
     pub fn broadcast(&self, message: PeerMessage) {
         let _ = self.outbound_tx.send(message);

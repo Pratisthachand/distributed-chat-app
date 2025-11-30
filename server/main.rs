@@ -254,6 +254,7 @@ async fn handle_client(
 
     // Reader task: read messages from client
     let client_name_clone = client_name.clone();
+    let new_msg_tx_clone = new_msg_tx.clone(); 
     let reader_task = tokio::spawn(async move {
         let mut line = String::new();
         loop {
@@ -264,7 +265,7 @@ async fn handle_client(
                     let content = line.trim().to_string();
                     if !content.is_empty() {
                         let msg = Message::new(0, server_id, client_name_clone.clone(), content, 0);
-                        let _ = new_msg_tx.send(msg);
+                        let _ = new_msg_tx_clone.send(msg);
                     }
                 }
                 Err(e) => return Err(e),
