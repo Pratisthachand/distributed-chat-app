@@ -1,4 +1,6 @@
 // Use AtomicU64 for thread-safe counter
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+
 #[derive(Debug)]
 pub struct LamportClock {
     counter: AtomicU64,
@@ -15,9 +17,9 @@ impl LamportClock{
     /// Increment the clock before sending a message
     /// Rule: C ← C + 1
     /// Returns the NEW incremented value
-    pub fn increment(&self){
+    pub fn increment(&self)-> u64{
         // fetch_add returns the OLD value, so we add 1 to get the NEW value in line 21
-        let old_value = self.counter.fetch_add(1,AtomicOrdering::SeqCst) //AtomicOrdering::SeqCst = "All threads see operations in the same order"
+        let old_value = self.counter.fetch_add(1,AtomicOrdering::SeqCst);//AtomicOrdering::SeqCst = "All threads see operations in the same order"
         old_value + 1
     }
 
@@ -26,7 +28,7 @@ impl LamportClock{
     /// Returns the NEW updated value
     /// This ensures our clock is always ahead of any timestamp we've seen,
     /// maintaining the causality property.
-    pub fn update(&self, received_timestamp){
+    pub fn update(&self, received_timestamp: u64)-> u64{
         let mut current = self.counter.load(AtomicOrdering::SeqCst);
 
         loop {
@@ -50,12 +52,12 @@ impl LamportClock{
     }
 
     /// Get the current clock value without modifying it
-    pub fn get(&self){
+    pub fn get(&self)-> u64{
         self.counter.load(AtomicOrdering::SeqCst)
-    }
+    }   
     
     /// Set the clock to a specific value
-    pub fn set(&self, value) {
+    pub fn set(&self, value:u64) {
         self.counter.store(value, AtomicOrdering::SeqCst);
     }
 }
