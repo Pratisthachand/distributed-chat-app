@@ -95,17 +95,64 @@ async fn run_server(
     let peer_manager = Arc::new(peer_manager);
     peer_manager.start().await;  // Start connecting to peers
 
-    // Listen for incoming peer connections
+    // Listen for incoming peer connections from lower-numbered servers
     let peer_listener = TcpListener::bind(format!("0.0.0.0:{}", peer_port)).await?;
     println!("[Server {}] Listening for peers on port {}", server_id, peer_port);
 
+    let peer_mgr_for_incoming = Arc::clone(&peer_manager);
     let peer_server_id = server_id;
+    
     tokio::spawn(async move {
         loop {
-            if let Ok((stream, addr)) = peer_listener.accept().await {
-                println!("[Server {}] Incoming peer from {}", peer_server_id, addr);
+            if let Ok((stream, _addr)) = peer_listener.accept().await {
+                let peer_mgr = Arc::clone(&peer_mgr_for_incoming);
+                let inbound_tx = peer_mgr.get_inbound_tx();
+                let mut outbound_rx = peer_mgr.get_outbound_rx();
+                
                 tokio::spawn(async move {
-                    let _ = handle_incoming_peer(stream).await;
+                    let (reader, mut writer) = stream.into_split();
+                    let mut buf_reader = tokio::io::BufReader::new(reader);    
+                                         
+                    // Read peer ID
+                    let mut line = String::new();
+                    if buf_reader.read_line(&mut line).await.is_err() {
+                        return;
+                    }
+                    let peer_id: u32 = line.trim().parse().unwrap_or(0);
+                    
+                    // Spawn reader task
+                    let inbound_tx_clone = inbound_tx.clone();
+                    let reader_task = tokio::spawn(async move {
+                        let mut line = String::new();
+                        loop {
+                            line.clear();
+                            match buf_reader.read_line(&mut line).await {
+                                Ok(0) => break,
+                                Ok(_) => {
+                                    if let Ok(msg) = serde_json::from_str::<PeerMessage>(line.trim()) {
+                                        let _ = inbound_tx_clone.send(msg);
+                                    }
+                                }
+                                Err(_) => break,
+                            }
+                        }
+                    });
+                    
+                    // Spawn writer task
+                    let writer_task = tokio::spawn(async move {
+                        while let Ok(msg) = outbound_rx.recv().await {
+                            let json = serde_json::to_string(&msg).unwrap();
+                            let line = format!("{}\n", json);
+                            if writer.write_all(line.as_bytes()).await.is_err() {
+                                break;
+                            }
+                        }
+                    });
+                    
+                    tokio::select! {
+                        _ = reader_task => {},
+                        _ = writer_task => {},
+                    }
                 });
             }
         }

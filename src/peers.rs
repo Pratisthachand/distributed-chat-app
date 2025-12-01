@@ -121,6 +121,7 @@ impl PeerManager {
         let peers = self.peers.read().await;
         let peer_list: Vec<(u32, String)> = peers
             .values()
+            .filter(|p| p.id > self.server_id)  // Only connect to higher-numbered peers to avoid duplicates
             .map(|p| (p.id, p.address.clone()))
             .collect();
         drop(peers);
@@ -317,5 +318,17 @@ impl PeerManager {
     pub async fn get_peer_timestamps(&self) -> HashMap<u32, u64> {
         let peers = self.peers.read().await;
         peers.iter().map(|(id, state)| (*id, state.last_timestamp)).collect()
+    }
+
+    /// Get a clone of the inbound channel sender
+    /// Used by incoming peer listener to forward messages
+    pub fn get_inbound_tx(&self) -> mpsc::UnboundedSender<PeerMessage> {
+        self.inbound_tx.clone()
+    }
+    
+    /// Get a receiver for outbound messages
+    /// Used by incoming peer listener to broadcast messages
+    pub fn get_outbound_rx(&self) -> broadcast::Receiver<PeerMessage> {
+        self.outbound_tx.subscribe()
     }
 }
