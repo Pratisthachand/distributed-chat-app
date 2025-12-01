@@ -89,7 +89,7 @@ async fn run_server(
     let (peer_manager, mut peer_rx) = PeerManager::new(
         server_id, 
         peers.clone(), 
-        1000,  // Send heartbeat every 1 second
+        100,  // Send heartbeat every 100ms
         5000   // Mark peer dead after 5 seconds
     );
     let peer_manager = Arc::new(peer_manager);
@@ -100,7 +100,7 @@ async fn run_server(
     println!("[Server {}] Listening for peers on port {}", server_id, peer_port);
 
     let peer_mgr_for_incoming = Arc::clone(&peer_manager);
-    let peer_server_id = server_id;
+    let _peer_server_id = server_id;
     
     tokio::spawn(async move {
         loop {
@@ -118,7 +118,7 @@ async fn run_server(
                     if buf_reader.read_line(&mut line).await.is_err() {
                         return;
                     }
-                    let peer_id: u32 = line.trim().parse().unwrap_or(0);
+                    let _peer_id: u32 = line.trim().parse().unwrap_or(0);
                     
                     // Spawn reader task
                     let inbound_tx_clone = inbound_tx.clone();
@@ -235,7 +235,6 @@ async fn run_server(
             let delivered = queue_clone.try_deliver().await;
             for msg in delivered {
                 let display = format!("[T:{}] {}: {}", msg.timestamp, msg.client_name, msg.content);
-                println!("[Server {}] DELIVERING: {}", server_id, display);
                 // Broadcast to all local clients
                 let _ = client_tx_clone.send(display);
             }
@@ -248,7 +247,7 @@ async fn run_server(
     let peer_mgr_clone = Arc::clone(&peer_manager);
 
     tokio::spawn(async move {
-        let mut interval = time::interval(Duration::from_millis(1000));
+        let mut interval = time::interval(Duration::from_millis(100));
         loop {
             interval.tick().await;
             let timestamp = clock_clone.get();
@@ -328,11 +327,15 @@ async fn handle_client(
                     if writer.write_all(format!("{}\n", msg).as_bytes()).await.is_err() {
                         break;
                     }
+                    if writer.flush().await.is_err() {
+                        break;
+                    }
                 }
                 Err(_) => break,
             }
         }
     });
+
 
     // Wait for either task to finish
     tokio::select! {
